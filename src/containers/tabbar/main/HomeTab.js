@@ -38,6 +38,7 @@ export default function HomeTab({navigation}) {
   const [user, setUserData] = useState();
   const [insertedData, setInsertedData] = useState(null);
   const [location, setLocation] = useState({latitude: 0, longitude: 0});
+  const [refreshing, setRefreshing] = useState(false);
 
   Geolocation.getCurrentPosition(data => {
     setLocation({
@@ -98,6 +99,9 @@ export default function HomeTab({navigation}) {
         .then(({data}) => {
           setCurrentInsertId(data.data.insertId);
           setInsertedData(user);
+          AsyncStorage.setItem('btnTextDay', strings.daycheckout);
+          AsyncStorage.setItem('lastClickedButton', 'day');
+          AsyncStorage.setItem('currentInsertId', data.data.insertId.toString());
           Alert.alert('Day Attendance inserted successfully.');
           navigation.navigate('AttendanceTab', {insertedData: user});
         })
@@ -121,6 +125,9 @@ export default function HomeTab({navigation}) {
         .then(({data}) => {
           setCurrentInsertId(data.data.insertId);
           setInsertedData(user);
+          AsyncStorage.setItem('btnTextNight', strings.nightcheckout);
+          AsyncStorage.setItem('lastClickedButton', 'night');
+          AsyncStorage.setItem('currentInsertId', data.data.insertId.toString());
           Alert.alert('Night Attendance inserted successfully.');
           navigation.navigate('AttendanceTab', {insertedData: user});
         })
@@ -152,6 +159,9 @@ export default function HomeTab({navigation}) {
         .then(() => {
           Alert.alert('Day check-out time inserted successfully.');
           setInsertedData(user);
+          AsyncStorage.setItem('btnTextDay', strings.daycheckIn);
+          AsyncStorage.removeItem('lastClickedButton');
+          AsyncStorage.removeItem('currentInsertId');
           navigation.navigate('AttendanceTab', {insertedData: user});
         })
         .catch(() => {
@@ -172,6 +182,9 @@ export default function HomeTab({navigation}) {
         .then(() => {
           Alert.alert('Night check-out time inserted successfully.');
           setInsertedData(user);
+          AsyncStorage.setItem('btnTextNight', strings.nightcheckIn);
+          AsyncStorage.removeItem('lastClickedButton');
+          AsyncStorage.removeItem('currentInsertId');
           navigation.navigate('AttendanceTab', {insertedData: user});
         })
         .catch(() => {
@@ -251,6 +264,31 @@ export default function HomeTab({navigation}) {
   useEffect(() => {
     setIsLoading(true);
     getProject();
+    // Restore persisted button states and currentInsertId
+    const restoreState = async () => {
+      try {
+        const storedBtnTextDay = await AsyncStorage.getItem('btnTextDay');
+        const storedBtnTextNight = await AsyncStorage.getItem('btnTextNight');
+        const storedLastClickedButton = await AsyncStorage.getItem('lastClickedButton');
+        const storedCurrentInsertId = await AsyncStorage.getItem('currentInsertId');
+
+        if (storedBtnTextDay) {
+          setBtnTextDay(storedBtnTextDay);
+        }
+        if (storedBtnTextNight) {
+          setBtnTextNight(storedBtnTextNight);
+        }
+        if (storedLastClickedButton) {
+          setLastClickedButton(storedLastClickedButton);
+        }
+        if (storedCurrentInsertId) {
+          setCurrentInsertId(parseInt(storedCurrentInsertId, 10));
+        }
+      } catch (error) {
+        console.log('Error restoring state from AsyncStorage:', error);
+      }
+    };
+    restoreState();
   }, [colors]);
   useEffect(() => {
     getUser();
@@ -273,6 +311,36 @@ export default function HomeTab({navigation}) {
   };
 
   // Search Functionality End
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    setIsLoading(true);
+    await getProject();
+    // Restore persisted button states and currentInsertId on refresh
+    try {
+      const storedBtnTextDay = await AsyncStorage.getItem('btnTextDay');
+      const storedBtnTextNight = await AsyncStorage.getItem('btnTextNight');
+      const storedLastClickedButton = await AsyncStorage.getItem('lastClickedButton');
+      const storedCurrentInsertId = await AsyncStorage.getItem('currentInsertId');
+
+      if (storedBtnTextDay) {
+        setBtnTextDay(storedBtnTextDay);
+      }
+      if (storedBtnTextNight) {
+        setBtnTextNight(storedBtnTextNight);
+      }
+      if (storedLastClickedButton) {
+        setLastClickedButton(storedLastClickedButton);
+      }
+      if (storedCurrentInsertId) {
+        setCurrentInsertId(parseInt(storedCurrentInsertId, 10));
+      }
+    } catch (error) {
+      console.log('Error restoring state from AsyncStorage:', error);
+    }
+    setRefreshing(false);
+    setIsLoading(false);
+  };
 
   const renderVerticalItem = ({item, index}) => {
     return (
@@ -321,6 +389,8 @@ export default function HomeTab({navigation}) {
           estimatedItemSize={10}
           contentContainerStyle={localStyles.contentContainerStyle}
           showsVerticalScrollIndicator={false}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
         />
       </View>
 
