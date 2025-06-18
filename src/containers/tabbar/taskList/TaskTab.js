@@ -1,12 +1,11 @@
-// Library Imports
 import {StyleSheet, View} from 'react-native';
 import React, {useState, useEffect} from 'react';
 import {useSelector} from 'react-redux';
 import {FlashList} from '@shopify/flash-list';
 import filter from 'lodash/filter';
-import SearchComponent from '../../../components/homeComponent/SearchComponent';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Custom Imports
+import SearchComponent from '../../../components/homeComponent/SearchComponent';
 import {styles} from '../../../themes';
 import strings from '../../../i18n/strings';
 import ListData from './ListData';
@@ -17,51 +16,49 @@ export default function TaskTab({route}) {
   const colors = useSelector(state => state.theme.theme);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [fullData, setFullData] = useState('');
+  const [fullData, setFullData] = useState([]);
   const [searchProject, setSearchProject] = useState('');
   const [extraData, setExtraData] = useState(true);
   const [data, setData] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [user, setUser] = useState(null);
+
+  const fetchUser = async () => {
+    const storedUser = await AsyncStorage.getItem('USER');
+    setUser(JSON.parse(storedUser));
+  };
+
+  const fetchData = async () => {
+    try {
+      const res = await api.get('/attendance/getEmployeeData');
+      const filtered = res.data.data.filter(i => i.staff_id === user?.staff_id);
+      setData(filtered);
+      setFullData(filtered);
+    } catch (err) {
+      alert('Network connection error.');
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
     setIsLoading(true);
-    api
-      .get('/attendance/getEmployeeData')
-      .then(res => {
-        setData(res.data.data);
-        setFullData(res.data.data);
-        setIsLoading(false);
-      })
-      .catch(() => {
-        alert('Network connection error.');
-        setError(error);
-        setIsLoading(false);
-      });
+    fetchUser();
   }, []);
 
   useEffect(() => {
-    if (route.params && route.params.insertedData) {
-      setData(prevData => [...prevData, route.params.insertedData]);
-
-      api
-        .get('/attendance/getEmployeeData')
-        .then(res => {
-          setData(res.data.data);
-          setFullData(res.data.data);
-          setIsLoading(false);
-        })
-        .catch(() => {
-          alert('Network connection error.');
-          setError(error);
-          setIsLoading(false);
-        });
+    if (user) {
+      fetchData();
     }
-  }, [route.params]);
+  }, [user]);
 
   useEffect(() => {
-    setIsLoading(true);
-    setExtraData(!extraData);
-  }, [colors]);
+    if (route.params && route.params.insertedData && user) {
+      fetchData();
+    }
+  }, [route.params]);
 
   const handleSearch = query => {
     setSearchProject(query);
@@ -69,38 +66,27 @@ export default function TaskTab({route}) {
     setData(filteredData);
   };
 
-  const contains = ({title}, query) => {
-    return title?.toLowerCase().includes(query.toLowerCase());
-  };
+  const contains = ({title}, query) =>
+    title?.toLowerCase().includes(query.toLowerCase());
 
   const onRefresh = () => {
     setRefreshing(true);
-    api
-      .get('/attendance/getEmployeeData')
-      .then(res => {
-        setData(res.data.data);
-        setFullData(res.data.data);
-        setRefreshing(false);
-      })
-      .catch(() => {
-        alert('Network connection error.');
-        setError(error);
-        setRefreshing(false);
-      });
+    fetchData();
   };
 
-  const renderVerticalItem = ({item}) => <ListData item={item} />;
+  const renderVerticalItem = ({item}) => <ListData item={item} user={user} />;
 
   return (
     <View style={[styles.flexGrow1, {backgroundColor: '#F5F5F5'}]}>
       <View style={{backgroundColor: colors.backgroundColor3}}>
         <EHeader title={strings.TaskList} />
+        {/* Optional Search */}
         {/* <SearchComponent
           search={searchProject}
           onSearchInput={handleSearch}
           isLoading={isLoading}
           error={error}
-          style={{marginTop:-20}}
+          style={{marginTop: -20}}
         /> */}
       </View>
 
@@ -108,7 +94,7 @@ export default function TaskTab({route}) {
         data={data}
         renderItem={renderVerticalItem}
         keyExtractor={(item, index) => index.toString()}
-        estimatedItemSize={120} // ✅ updated to match average item height
+        estimatedItemSize={160} // more accurate
         contentContainerStyle={localStyles.contentContainerStyle}
         showsVerticalScrollIndicator={false}
         refreshing={refreshing}
