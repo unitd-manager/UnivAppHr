@@ -18,13 +18,16 @@ jobs:
           node-version: 18.20.6
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps # Add this flag
+        run: npm install --legacy-peer-deps
 
       - name: Setup Java
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: 17
+
+      - name: Grant execute permission to gradlew
+        run: chmod +x ./android/gradlew
 
       - name: Build APK
         run: |
