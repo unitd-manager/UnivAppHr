@@ -11,6 +11,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
@@ -29,11 +31,34 @@ jobs:
       - name: Grant execute permission to gradlew
         run: chmod +x ./android/gradlew
 
+      # ✅ FIXED: Decode and write keystore correctly
+      - name: Decode Keystore
+        run: |
+          echo "${KEYSTORE_BASE64}" | base64 --decode > android/app/my-upload-key.keystore
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+
+      # ✅ Create keystore.properties for signing config
+      - name: Create Keystore Properties
+        run: |
+          echo "storeFile=my-upload-key.keystore" > keystore.properties
+          echo "keyAlias=${KEY_ALIAS}" >> keystore.properties
+          echo "keyPassword=${KEY_PASSWORD}" >> keystore.properties
+          echo "storePassword=${STORE_PASSWORD}" >> keystore.properties
+        working-directory: ./android
+        env:
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+
+      # ✅ Build signed release APK
       - name: Build APK
         run: |
           cd android
-          ./gradlew assembleRelease
+          ./gradlew clean assembleRelease
 
+      # ✅ Upload APK as build artifact
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
